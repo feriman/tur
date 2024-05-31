@@ -12,3 +12,16 @@ variable "server_port" {
   type = number
   default = 8080
 }
+
+# In addition to input variables, Terraform also allows you to define
+# output variables. For example, instead of having to manually poke
+# around the EC2 console to find the IP address of your server, you
+# can provide the IP address as an output variable.
+# You can also use the `terraform output' command to list all outputs
+# without applying any changes. You can run `terraform output <OUTPUT_NAME>
+# to see the value of a specific output called <OUTPUT_NAME>.
+#
+output "public_ip" {
+  value = aws_instance.example.public_ip
+  description = "The public IP address of the web server"
+}

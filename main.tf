@@ -2,10 +2,10 @@ provider "aws" {
   region = "eu-north-1"
 }
 
-resource "aws_instance" "example" {
+resource "aws_launch_configuration" "example" {
   # AMI - Amazon Machine Image
   #
-  ami = "ami-0705384c0b33c194c"
+  image_id = "ami-0705384c0b33c194c"
   instance_type = "t3.micro"
 
   # To access the ID of the security group resource, you are going to need
@@ -21,7 +21,7 @@ resource "aws_instance" "example" {
   # look like this:
   #   aws_security_group.instance.id
   #
-  vpc_security_group_ids = [aws_security_group.instance.id]
+  security_groups = [aws_security_group.instance.id]
 
   # The '<<-EOF' and 'EOF' are Terraform's heredoc syntax, which allows you
   # to create multiline strings without having to insert '\n' characters
@@ -33,18 +33,9 @@ resource "aws_instance" "example" {
     nohup busybox httpd -f -p ${var.server_port} &
     EOF
 
-  # This parameter is set to 'true' so when you change the 'user_data'
-  # parameter and run 'apply', Terraform will terminate the original
-  # instance and launch a totally new one. Terraform's default behaviour
-  # is to update the original instance in place, but since User Data runs
-  # only on the very first boot, and your original instance already went
-  # through  that boot process, you need to force the creation of a new
-  # instance to ensure your new User Data script actually gets executed.
-  #
-  user_data_replace_on_change = true
-
-  tags = {
-    Name = "terraform-example"
+  # Required when using a launch configuration with an auto scaling group.
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -60,5 +51,26 @@ resource "aws_security_group" "instance" {
     to_port = var.server_port
     protocol = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_autoscaling_group" "example" {
+  launch_configuration = aws_launch_configuration.example.name
+  vpc_zone_identifier  = data.aws_subnets.default.ids
+
+  min_size = 2
+  max_size = 10
+
+  tag {
+    key                 = "Name"
+    value               = "terraform-asg-example"
+    propagate_at_launch = true
+  }
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name = "vpc-id"
+    values = [data.aws_vpc.default.id]
   }
 }
